@@ -227,7 +227,7 @@ bear.init <- function(sim, known, trial, model, sig, size, traplocs, trapPath, b
 }
 
 bear.setup <- function(startstage=1){
-  for(p in 1:500){
+  for(p in 1:5){
     print(paste("Completed ", p-1 , " iterations. System time: ", Sys.time(), sep="", collapse = ""))
     oneDone<-FALSE
     if (oneDone==TRUE) {rm(list=ls())}
