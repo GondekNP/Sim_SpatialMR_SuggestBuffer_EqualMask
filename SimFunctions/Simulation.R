@@ -1,7 +1,6 @@
 #setwd("C:/Users/Gonde/OneDrive/Documents/R Projects/Sim_SpatialMR")
 setwd("D:/Sim_SpatialMR_SuggestBuffer_EqualBuffer")
 
-
 sim.bear <- function (known, sig, traplocs, int.g0=1, behav= -.7, IH=0, sessions=2, redun = 0, inhib=.2, stratDensity=0){
   library(sp)
   library(mosaic)
