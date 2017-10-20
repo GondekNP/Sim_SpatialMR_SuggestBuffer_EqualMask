@@ -1,5 +1,4 @@
 #setwd("C:/Users/Gonde/OneDrive/Documents/R Projects/Sim_SpatialMR")
-
 setwd("D:/Sim_SpatialMR_SuggestBuffer_EqualBuffer")
 
 
