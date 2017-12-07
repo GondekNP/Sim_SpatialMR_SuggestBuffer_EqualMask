@@ -91,6 +91,9 @@ library(mosaic)
 write.csv(compiledEmp, "Checks/CompiledEmp.csv")
 write.csv(compiledSim, "Checks/CompiledSim.csv")
 
+#compiledEmp<-read.csv("Checks/CompiledEmp.csv")
+#compiledSim<-read.csv("Checks/CompiledSim.csv")
+
 #need to split up sim into simnumber and subtype 
 split<-strsplit(as.character(compiled$sim), split = "")
 simNo<-NULL
@@ -114,6 +117,7 @@ for (k in c("SimData", "EmpData")){
       for (t in  c("g0 tilde bk", "g0 tilde 1", "g0 tilde bk + t", "g0 tilde t")){
           j<-10001
           for (u in 1:(nrow(compiled))){
+              browser()
               nextSim<-filter(compiled, trial==h, simNo==j, whichSource==k, model==t, size==i)
               if(nrow(nextSim)==0){break}
               newLine<-nextSim
