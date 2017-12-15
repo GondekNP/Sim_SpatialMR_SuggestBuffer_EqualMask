@@ -1,0 +1,96 @@
+---
+title: "Sim Update 12/15/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+discrep<-read.csv("discrep.csv")
+library(ggplot2)
+library(dplyr)
+
+```
+
+## R Markdown
+
+g0 vs Subsampling Type
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, whichSource=="SimData", g0<10))+
+  scale_fill_grey() +
+  geom_boxplot(aes(x=trial, y=g0, fill=SubsamplingType)) +
+  ylab("g0") +
+  ggtitle("g0 \nvs Subsampling Type (Simulated)") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4)
+```
+
+plogis(g0) vs Subsampling Type
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, whichSource=="SimData"))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_boxplot(aes(x=trial, y=plogis(g0), fill=SubsamplingType)) +
+  ylab("plogis(g0)") +
+  ggtitle("plogis(g0) vs Subsampling Type (Simulated)") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4) +
+  geom_hline(aes(linetype=5), yintercept=.5)
+```
+
+d-hat of full estimate / d-hat of sub estimate vs Subsampling Type
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, whichSource=="SimData"))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_boxplot(aes(x=trial, y=DenhatBiasFullPct, fill=SubsamplingType)) +
+  ylab("d-hat of Sub / d-hat of Full") +
+  ggtitle("d-hat subtype / d-hat full \nvs Subsampling Type (Simulated)") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4)
+```
+ 
+prop of non redundant samples vs subtype  
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, trial==c("t4","t5","t6","t7", "Empirical"), subtype!="Full"))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_boxplot(aes(x=trial, y=SubProp.notRedun, fill=subtype)) +
+  ylab("Proportion of \nnon-redundant Samples") +
+  xlab("Trial") +
+  ggtitle("Sample Redundancy \nvs Subsampling Type") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4)
+``` 
+
+Denhat vs subtype (Empirical)  
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, whichSource=="EmpData"))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
+  ylab("Derived density") +
+  xlab("Trial") +
+  ggtitle("d-hat \nvs Subsampling Type (Empirical)") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4)
+```
+
+Denhat vs subtype (Empirical)  
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, whichSource=="EmpData"))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_boxplot(aes(x=trial, y=DenhatBiasFullPct, fill=subtype)) +
+  ylab("Derived density") +
+  xlab("Trial") +
+  ggtitle("d-hat subtype / d-hat full \nvs Subsampling Type (Empirical)") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4)
+```
+
+```{r fig.height=15, fig.width=15}
+ggplot(data=filter(discrep, whichSource=="SimData"))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_boxplot(aes(x=trial, y=plogis(g0), fill=SubsamplingType)) +
+  ylab("plogis(g0)") +
+  ggtitle("plogis(g0) vs Subsampling Type (Simulated)") +
+  theme_grey(14) +
+  facet_wrap(size~model, ncol=4) +
+  geom_hline(aes(linetype=5), yintercept=.5)
+```
+
