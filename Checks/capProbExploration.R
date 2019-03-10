@@ -59,7 +59,7 @@ ggplot(data=g0frame,
        aes(x=xdists, y=g0dists, group=type)) +
        geom_line(aes(linetype=type)) +
       
-      scale_linetype_manual(name="Example \nScenario",
+      scale_linetype_manual(name="",
                         values=c(1,2,3,4,11),
                         breaks=c("control", "captured", "IH.hi", "IH.hi and captured","IH.lo"),
                         labels=list(TeX("$\\delta_i = 0$, $C_{i,t,k} = 0$"),
@@ -67,9 +67,9 @@ ggplot(data=g0frame,
                                     TeX("$\\delta_i \\approx \\Delta$, $C_{i,t,k} = 0$"),
                                     TeX("$\\delta_i \\approx \\Delta$, $C_{i,t,k} = 1$"),
                                     TeX("$\\delta_i \\approx -\\Delta$, $C_{i,t,k} = 0$"))) +
-      ylab("g")+
-      xlab(TeX(" $\\psi$")) +
-      theme_grey(14)
+      ylab("g (capture probability)")+
+      xlab(TeX(" $\\psi$ (meters from $A_i$ to trap)" )) +
+      theme_bw(14)
       
   
 

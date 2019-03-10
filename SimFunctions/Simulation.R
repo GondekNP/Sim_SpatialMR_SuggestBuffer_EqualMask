@@ -1,5 +1,6 @@
 #setwd("C:/Users/Gonde/OneDrive/Documents/R Projects/Sim_SpatialMR")
-setwd("D:/Sim_SpatialMR_SuggestBuffer_EqualMask")
+# setwd("D:/Sim_SpatialMR_SuggestBuffer_EqualMask")
+setwd("~/GitHub/spatialMR-master/Sim_SpatialMR_SuggestBuffer_EqualMask")
 
 sim.bear <- function (known, sig, traplocs, int.g0=1, behav= -.7, IH=0, sessions=2, redun = 0, inhib=.2, stratDensity=0){
   library(sp)
@@ -81,53 +82,57 @@ sim.bear <- function (known, sig, traplocs, int.g0=1, behav= -.7, IH=0, sessions
   return(BearSamps)
 }
 
-secr.from.samples<-function (full, samps, trapcsv, subtype, modEval, trial, number, sizechar, fullN, source, sizeSuccess)  { 
-  sampsAnalyzed<-samps
-  samps<-samps[!duplicated(samps$INDuniqID),]
-  library(secr)
-  fitted<-NULL
-  if (sizeSuccess==TRUE){
-    strt<-Sys.time()
-    patht0<-tempfile(fileext = ".csv")
-    
-    if(source=="EmpData"){
-      #Gender: Sex = 204.25 -> Male, Sex= 250.25 ->Female
-      samps$Group<-rep("M",nrow(samps))
-      samps$Group[samps$Sex==250.25]<-"F" 
-      
-      #Create a data set that contains a count of the number of times each bear
-      #was seen for each unique site x period combination. 
-      caphist<- samps%>%group_by(ID, site, Period)%>%
-        summarize(Count= n())
-      sexid<-unique(select(samps, ID, Group))
-      caphist2<-merge(caphist, sexid, all=FALSE)
-      samps<-data.frame(Session="BearMR", ID=caphist$ID, Occassion=caphist2$Period, Detector=caphist2$site, Sex=caphist2$Group)
-    }
-    
-    write.table(samps, file=patht0, sep = ",") 
-    
-    try({
-      t0caphist<-read.capthist(captfile = patht0, trapfile = trapcsv, detector = 'proximity')
-      buff<-suggest.buffer(t0caphist, detectfn = 0)
-      fitted<-secr.fit(t0caphist, model = modEval, buffer = buff, trace = FALSE, CL=TRUE, detectfn = 0)})
-    
-    if(!is.null(fitted)){outcome<-TRUE} else{outcome<-FALSE; print("Model fit failed.")}
-    fitted$timeElapsed<-Sys.time() - strt
-    fitted$sampsAnalyzed <- sampsAnalyzed
-    fitted$subsamps<-samps
-    fitted$outcome<-outcome
-    
-  } 
-  fitted$fullsamps<-full
-  fitted$fullN<-fullN
-  fitted$sizeSuccess<-sizeSuccess
-  
+secr.from.samples<-function (full, samps, trapcsv, subtype, modEval, trial, number, sizechar, fullN, source, sizeSuccess, pathOverride = NULL)  { 
+  if (!is.logical(samps)){
+          sampsAnalyzed<-samps
+        samps<-samps[!duplicated(samps$INDuniqID),]
+        library(secr)
+        fitted<-NULL
+        if (sizeSuccess==TRUE){
+          strt<-Sys.time()
+          patht0<-tempfile(fileext = ".csv")
+          
+          if(source=="EmpData"){
+            #Gender: Sex = 204.25 -> Male, Sex= 250.25 ->Female
+            samps$Group<-rep("M",nrow(samps))
+            samps$Group[samps$Sex==250.25]<-"F" 
+            
+            #Create a data set that contains a count of the number of times each bear
+            #was seen for each unique site x period combination. 
+            caphist<- samps%>%group_by(ID, site, Period)%>%
+              summarize(Count= n())
+            sexid<-unique(select(samps, ID, Group))
+            caphist2<-merge(caphist, sexid, all=FALSE)
+            samps<-data.frame(Session="BearMR", ID=caphist$ID, Occassion=caphist2$Period, Detector=caphist2$site, Sex=caphist2$Group)
+          }
+          
+          write.table(samps, file=patht0, sep = ",") 
+          
+          try({
+            t0caphist<-read.capthist(captfile = patht0, trapfile = trapcsv, detector = 'proximity')
+            buff<-suggest.buffer(t0caphist, detectfn = 0)
+            fitted<-secr.fit(t0caphist, model = modEval, buffer = buff, trace = FALSE, CL=TRUE, detectfn = 0)})
+          
+          if(!is.null(fitted)){outcome<-TRUE} else{outcome<-FALSE; print("Model fit failed.")}
+          fitted$timeElapsed<-Sys.time() - strt
+          fitted$sampsAnalyzed <- sampsAnalyzed
+          fitted$subsamps<-samps
+          fitted$outcome<-outcome
+          
+        } 
+        fitted$fullsamps<-full
+        fitted$fullN<-fullN
+        fitted$sizeSuccess<-sizeSuccess
+        fitted$derived<-derived(fitted)
+        print(fitted$derived)
+  } else (fitted<-NULL)
   #now save the object in some logical way as RDS
   modEval<-Reduce(paste, deparse(modEval))
   modelPathName<-gsub(pattern = " ~ ", replacement = " tilde " , x = modEval)
-  pathRDS<-paste(source,"/", trial, "/" , modelPathName , "/", sizechar, "/", subtype, number, ".rds", collapse="", sep="")
-  fitted$derived<-derived(fitted)
-  print(fitted$derived)
+  if (is.null(pathOverride)){
+    pathRDS<-paste(source,"/", trial, "/" , modelPathName , "/", sizechar, "/", subtype, number, ".rds", collapse="", sep="")
+  } else {pathRDS<- pathOverride}
+
   print(pathRDS)
   saveRDS(fitted, file = pathRDS)
 }

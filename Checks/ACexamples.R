@@ -45,27 +45,4 @@ traplocs<-cbind(make.grid(nx=6, ny=6, spacing = 800), ID="TRAP")
 strat1<-rbind(strat1,traplocs)
 strat2<-rbind(strat2,traplocs)
 
-gg1<-ggplot(aes(y=y, x=x, colour=ID), data=strat1)+
-         geom_point(aes(colour=ID), size=2.5)+
-          scale_colour_grey(name=TeX("$\\alpha = .75$"),
-                            breaks=c("BEAR", "TRAP"),
-                            labels=list(TeX("$\\A_i$"), TeX("$\\D_t$"))) +
-          xlim(-500,4500)+
-          ylim(-500,4500)+
-          theme_gray(14)+
-  coord_fixed(ratio=1)
-gg1
 
-gg2<-ggplot(aes(y=y, x=x, colour=ID), data=strat2)+
-  geom_point(aes(colour=ID), size=2.5)+
-  scale_colour_grey(name=TeX("$\\alpha =  0 $ "),
-                    breaks=c("BEAR", "TRAP"),
-                    labels=list(TeX("$\\A_i$"), TeX("$\\D_t$"))) +
-  xlim(-500,4500)+
-  ylim(-500,4500)+
-  theme_gray(14) +
-  coord_fixed(ratio=1)
-gg2
-
-library(cowplot)
-cowplot::plot_grid(gg1,gg2, ncol=1)
