@@ -1,0 +1,44 @@
+\begin{thebibliography}{6}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{{\tt #1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+
+\bibitem[{Fournier et~al.(1982)Fournier, Fussell, and
+  Carpenter}]{Fournier_1982}
+Fournier, A., D.~Fussell, and L.~Carpenter, 1982.
+\newblock Computer Rendering of Stochastic Models.
+\newblock Pages 16--19 {\em in\/} Communications of the ACM, June 1982.
+
+\bibitem[{Gibeau and Herrero(1998)}]{Gibeau_1998}
+Gibeau, M., and S.~Herrero, editors, 1998.
+\newblock Roads, rails and grizzly bears in the Bow River Valley, Alberta.
+  Proceedings International Conference on Ecology and Transportation.
+
+\bibitem[{Hirzel and Arlettaz(2003)}]{Hirzel_2003_PROC}
+Hirzel, A.~H., and R.~Arlettaz, 2003.
+\newblock Environmental-envelope based habitat-suitability models.
+\newblock Pages 67--76 {\em in\/} B.~F.~J. Manly, editor. 1st Conference on
+  Resource Selection by Animals. Omnipress, Laramie, USA.
+
+\bibitem[{Holand et~al.(1998)Holand, Mysterud, Wannag, and
+  Linnell}]{Holand_1998}
+Holand, O., A.~Mysterud, A.~Wannag, and J.~Linnell, 1998.
+\newblock Roe deer in northern environments: physiology and behaviour.
+\newblock Pages 117--137 {\em in\/} R.~Andersen, D.~P., and J.~Linnell,
+  editors. The European roe deer: the biology of success. Scandinavian
+  University Press, Oslo, Norway.
+
+\bibitem[{Looijen(1998)}]{Looijen_1998_PhD}
+Looijen, R.~C., 1998.
+\newblock Holism and Reductionism in Biology and Ecology - The mutual
+  dependence of higher and lower level research programmes.
+\newblock Ph.D. thesis, University of Groningen (the Netherlands).
+
+\bibitem[{Ray et~al.(2005)Ray, Redford, Steneck, and Berger}]{Ray_2005_Bk}
+Ray, J.~C., K.~H. Redford, R.~S. Steneck, and J.~Berger, editors.
+\newblock 2005.
+\newblock Large carnivores and the conservation of biodiversity.
+\newblock Island Press, Washington.
+
+\end{thebibliography}

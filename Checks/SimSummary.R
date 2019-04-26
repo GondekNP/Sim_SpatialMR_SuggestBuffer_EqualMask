@@ -20,6 +20,7 @@ if (whichSource=="EmpData"){trials<-"t1"}
 for(j in trials){
     for (k in c("g0 tilde bk", "g0 tilde 1", "g0 tilde bk + t", "g0 tilde t")){
     for (l in c("850", "550", "250")){
+      OGpath = paste0(whichSource, "_", j, "_", k, "_", l)
       path<-paste(whichSource,"/", j, "/", k,"/",l, sep="", collapse="")
       files<-list.files(path)
       whichDesktop<-which(files=="desktop.ini")
@@ -29,15 +30,31 @@ for(j in trials){
       files<-paste(path, files, sep="/")
       
       for (m in 1:length(files)){
-        newSECR<-readRDS(files[m])
+        try({ newSECR <- readRDS(files[m])})
+        if(!exists("newSECR")){next()}
         subtype = str_extract(files[m], "(?<=\\d{3}/).*(?=\\d{5})")
-        if(str_detect(files[m], "Full")){size = nrow(newSECR$fullsamps)}else{size = str_extract(files[m], "(?<=_).*(?=.rds)")}
+        
+        if(str_detect(files[m], "Full")){
+          size = nrow(newSECR$fullsamps)
+          model = str_extract(basename(files[m]), "g0 tilde [^\\.]{1,2}")
+          if (is.na(model)){ model <- k}
+        } else
+          if(str_detect(basename(files[m]), "tilde")) {
+          size = str_extract(files[m], "(?<=_).*(?=_g0)")
+          model = str_extract(basename(files[m]), "g0 tilde [^\\.]{1,2}")
+          }
+        else{
+          size = str_extract(files[m], "(?<=_).*(?=.rds)")
+          model<-k
+          
+          }
         simNo = paste0(str_extract(files[m], "(?<=/)\\d{3}(?=/)"), "_", str_extract(files[m], "\\d{5}(?=.*.rds)"))
         trial<-j
-        model<-k
-        OGpath = paste0(whichSource, "_", trial, "_", model, "_", simNo)
+       
         
-        if (is.null(newSECR)){
+        
+        
+              if (is.null(newSECR)){
           newLine<-data.frame(FullN.notRedun = NA, SubProp.notRedun = NA, SubN.notRedun = NA,
                               Denhat = NA, Denhat.SE = NA, g0 = NA, g0.bTRUE = NA, sigma = NA, trial, model,
                               size, simNo, subtype, fullN = NA, whichSource, sim=files[m], FullProp.notRedun = NA, OGpath)
@@ -110,16 +127,22 @@ for(j in trials){
   }
 }
 return(compiled)
-
 }
 
-# compiledEmp<-compile.secr.results()
-# compiledSim<-compile.secr.results("SimData")
-# compiled<-rbind(compiledEmp, compiledSim)
+compiledEmp<-compile.secr.results()
+ compiled<-rbind(compiledEmp, compiledSim)
+
+#prepare to find discrep- modified after having to run a second set
+compiled <- mutate(compiled, round = ifelse(str_detect(basename(as.character(sim)), "tilde"),'R2',"R1"),
+                   OGmodel = str_extract(sim, "(?<=t\\d/).*(?=/\\d\\d\\d)"),
+                   OGpath = paste0(whichSource, "_", trial, "_", OGmodel, "_", simNo, "_", round))
 
 # 
 # write.csv(compiledEmp, "Checks/CompiledEmp2019.csv")
 # write.csv(compiledSim, "Checks/CompiledSim2019.csv")
+# write.csv(compiled, "Checks/CompiledAll2019.csv")
+# saveRDS(compiled, "Checks/CompiledAll2019.Rda")
+saveRDS(compiled, "Checks/CompiledAll2019_failedSizeFull.Rda")
 
 
 discrep<-NULL # need a data frame describing the discrepancy between full sims and true density
@@ -127,56 +150,60 @@ avgEmpFull <-  filter(compiled, whichSource=='EmpData', subtype == 'Full') %>% s
 skipped<-0
 noFull <- data.frame()
 OGskipped<-character()
+
+cl<-makeCluster(detectCores()-1)
+registerDoParallel(cl)
+library(foreach)
+library(tidyverse)
+setwd("~/GitHub/spatialMR-master/Sim_SpatialMR_SuggestBuffer_EqualMask")
+
+avgEmpFull = filter(compiled, subtype == 'Full', whichSource == 'EmpData') %>% group_by(model) %>%
+  summarise(FullN.notRedun = mean(FullN.notRedun), SubN.notRedun = mean(SubN.notRedun), 
+            Denhat = mean(Denhat), Denhat.SE = mean(Denhat.SE), g0 = mean(g0),
+            g0.bTRUE = mean(g0.bTRUE, na.rm=T), sigma = mean(sigma), N = n())
+
+saveRDS(avgEmpFull, 'Checks/avgEmpFull.Rda')
+
+compiled <- readRDS("Checks/CompiledAll2019_failedSizeFull.Rda")
+# doParDiscrep = foreach(j = unique(compiled$OGpath), .combine = 'bind_rows', .multicombine = T) %do% {
 for (j in unique(compiled$OGpath)){
-  subSims <- filter(compiled, OGpath == j, subtype != 'Full', !is.na(g0))
-  if (nrow(subSims)<1) {
-    skipped<-skipped+1
-    print(paste0(j, " skipped: n skipped = ", skipped))
-    OGskipped <- c(OGskipped, j)
-    next()}
-  fullSim <- filter(compiled, OGpath == j, subtype == 'Full')
-  if (nrow(fullSim)<1){noFull <- bind_rows(subSims, noFull); next()}
-  
-  for (i in 1:(nrow(subSims) + 1)){
-    if(i == (nrow(subSims) + 1)){
-      newLine <- fullSim
-    } else{
-      newLine <- subSims[i,]
+  library(foreach)
+  library(tidyverse)
+  # trueDensity = .004047744
+      for (l in c("g0 tilde 1", "g0 tilde bk")){
+        subSims <- filter(compiled, OGpath == j, subtype != 'Full', !is.na(g0), model == l)
+        if (nrow(subSims)<1) {
+          # skipped<-skipped+1
+          # print(paste0(j, " skipped: n skipped = ", skipped))
+          # OGskipped <- c(OGskipped, j)
+          next()}
+        
+        fullSim <- filter(compiled, OGpath == j, subtype == 'Full', model == l)
+        
+        # if (nrow(fullSim)<1){noFull <- bind_rows(subSims, noFull); next()}
+        if (nrow(fullSim)<1){next()}
+        
+        for (i in 1:(nrow(subSims) + 1)){
+          if(i == (nrow(subSims) + 1)){
+            newLine <- fullSim
+          } else{
+            newLine <- subSims[i,]
+          }
+          
+          newLine$DenhatBiasFullPct <- newLine$Denhat / fullSim$Denhat
+          newLine$DenhatBiasFull <- newLine$Denhat - fullSim$Denhat
+          newLine$DenhatBiasTrue <- newLine$Denhat - trueDensity #Universal secr density is animals per hectare
+          newLine$DenhatBiasTruePct <- newLine$Denhat / trueDensity #Universal secr density is animals per hectare
+          
+          discrep <- bind_rows(discrep, newLine)
+          print(newLine)
+          # return(newLine)
+          
+        }
+      }
     }
-    newLine$DenhatBiasFullPct <- newLine$Denhat / fullSim$Denhat
-    newLine$DenhatBiasFull <- newLine$Denhat - fullSim$Denhat
-    newLine$DenhatBiasTrue <- newLine$Denhat - trueDensity #Universal secr density is animals per hectare
-    newLine$DenhatBiasTruePct <- newLine$Denhat / trueDensity #Universal secr density is animals per hectare
 
-    discrep <- bind_rows(discrep, newLine)
-    print(newLine)
-  }
-}
-#Skip we need the discrepancy for each individual simulation
-# #Todo: fix for two diff models
-# # discrep<-NULL
-# # for (k in c("SimData", "EmpData")){
-# #   for (h in c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8")){
-# #     for (i in c(250,550,850)){
-# #       for (t in  c("g0 tilde bk", "g0 tilde 1", "g0 tilde bk + t", "g0 tilde t")){
-# #           j<-10001
-# #           for (u in 1:(nrow(compiled))){
-# #               nextSim<-filter(compiled, trial==h, simNo==j, whichSource==k, model==t, size==i)
-# #               if(nrow(nextSim)==0){break}
-# #               newLine<-nextSim
-# #               if(nrow(filter(nextSim, subtype=="Full"))>0){newLine$DenhatBiasFull<-nextSim[,4]-filter(nextSim, subtype=="Full")[,"Denhat"]} #Universal secr density is animals per hectare
-# #               #newLine$DenhatBiasTrue<-nextSim[,4]-trueDensity #Universal secr density is animals per hectare
-# #               
-# # 
-# #               discrep<-bind_rows(discrep, newLine)
-# #               j<-j+1
-# #           }
-# #       }
-# #     }
-# #   }
-# # }
-
-# write.csv(discrep, 'Checks/discrep_newSims.csv')
+# }
 
 ## cleanup
 # colnames(discrep)[13]<-"SubsamplingType"
@@ -186,28 +213,43 @@ compiledSim <- read.csv("Checks/CompiledSim2019.csv")
 compiled <- rbind(compiledSim, compiledEmp)
 discrep <- read.csv('Checks/discrep_newSims.csv')
 
+compiled$sizeRep <- compiled$size
 compiledA <- filter(compiled, subtype == "Full")
 compiledB <- filter(compiled, subtype != "Full")
  compiledA$sizeRep <- 'Full'
  compiledB$sizeRep <- compiledB$size
- 
+
 compiledA$SubProp.notRedun<-compiledA$FullProp.notRedun
 compiled<-rbind(compiledA, compiledB)
 compiled$subtype <- str_replace(compiled$subtype, "Spread.one", "SPR")
 compiled$subtype <- str_replace(compiled$subtype, "SimpleRandom", "SRS")
 compiled$SubsamplingType <- compiled$subtype
 
-compiled <- mutate(compiled, OGpath = paste0(whichSource, "_", trial, "_", model, "_", simNo))
-compiled <- mutate(compiled, SubProp.notRedun = SubN.notRedun / size)
-# 
+compiled <- mutate(compiled, SubProp.notRedun = SubN.notRedun / as.numeric(size))
+
+#
+colnames(discrep)[which(colnames(discrep) == "subtype")]<-"SubsamplingType"
+
+discrepEmp <- filter(discrep, whichSource == 'EmpData')
+compiledEmp <- filter(compiled, whichSource == 'EmpData')
+
+discrepEmp <- mutate(discrepEmp, size = ifelse(str_detect(basename(as.character(sim)), "Full"), '1019', str_extract(as.character(sim), "(?<=/)\\d\\d\\d(?=/)")))
+compiledEmp <- mutate(compiledEmp, size = ifelse(str_detect(basename(as.character(sim)), "Full"), '1019', str_extract(as.character(sim), "(?<=/)\\d\\d\\d(?=/)")))
+
+compiled<- rbind(compiledEmp, filter(compiled, whichSource=='SimData'))
+discrep <- rbind(discrepEmp, filter(discrep, whichSource=='SimData'))
+
 discrep$SubsamplingType <- str_replace(discrep$SubsamplingType, "Spread.one", "SPR")
 discrep$SubsamplingType <- str_replace(discrep$SubsamplingType, "SimpleRandom", "SRS")
+discrep$sizeRep <- discrep$size
 
 discrepA <- discrep %>% filter(SubsamplingType == 'Full')
 discrepB <- discrep %>% filter(SubsamplingType != 'Full')
+
 discrepA$sizeRep <- 'Full'
 discrepB$sizeRep <- as.character(discrepB$sizeRep)
 discrep<- bind_rows(discrepA, discrepB)
+rm(discrepA, discrepB)
 
 discrepA <- discrep %>% filter(whichSource == 'EmpData')
 discrepB <- discrep %>% filter(whichSource != 'EmpData')
@@ -215,11 +257,40 @@ discrepA$trial <- 'Empirical'
 discrep<- bind_rows(discrepA, discrepB)
 
 discrep <- discrep %>% mutate(model = str_replace(string = model, "tilde", "\\~"))
+discrepByOG = discrep %>% group_by(OGpath) %>% summarise(n())
+discrepByTrial = discrep %>% group_by(trial, model, sizeRep) %>% summarise(N = length(unique(OGpath)))
+compiledByTrial = compiled %>% group_by(trial, model) %>% summarise(N = length(unique(OGpath)))
 
+# write.csv(discrep, 'Checks/discrep_newSims.csv')
+
+#To avoid bad science, evening out samples of each trial x siz replicate x model combination.
+#Since I did this weirdly, by running the sim and then checking to see if the size had been exceeded, some reps are smaller than others 
+#particularly those without redundancy and the only-redundancy high sample size ones. Still, lowest is 451 which is over twice as big as it was before
+#so no harm really.
+set.seed(1231241)
+discrepSlim <- data.frame()
+for (j in unique(discrep$trial)){
+  for (i in unique(discrep$model)){
+    for (d in unique(discrep$sizeRep)){
+      discrepNow <- filter(discrep, trial == j, model == i, sizeRep == d)
+      if (length(unique(discrepNow$OGpath))>450) {
+        discrepOGpathsAdd <- sample(unique(discrepNow$OGpath), 451)
+        discrepAdd <- discrepNow %>% filter(OGpath %in% discrepOGpathsAdd)# 451 is the min sim amt 
+      }else{
+        discrepAdd <- discrepNow
+        } #for Emps
+      
+      discrepSlim <- bind_rows(discrepSlim, discrepAdd)
+    }
+  }
+}
+
+#should be 451s everywhere
+discrepSlimByTrial = discrepSlim %>% group_by(trial, model, sizeRep) %>% summarise(N = length(unique(OGpath)))
+#looks good
+write_csv(discrepSlim, 'Checks/discrep_451replicates.csv')
 
 # #Money plots
-
-
 failedSize <- compiled %>% filter(is.na(g0))
 compiled <- compiled %>% filter(!is.na(g0))
 
@@ -262,12 +333,37 @@ ggplot(data=filter(compiled, trial %in% c("t4","t5","t6","t7"), SubProp.notRedun
   theme(legend.position="bottom", legend.title=element_blank()) +
   facet_wrap(~sizeRep, ncol = 4)+ ggsave("Figures/violin_Color_PropNonRedun_Sim_withFull.png", height=5, width = 7.5)
 
-d1 = filter(discrep, whichSource == "EmpData")
-d2 = filter(discrep, whichSource == "SimData")
-d1$trial = "Empirical"
-discrep = rbind(d1,d2)
 
-ggplot(data=filter(discrep, whichSource=="SimData", size=="250", model == "g0 ~ 1" | model == "g0 ~ bk", SubsamplingType!="Full", DenhatBiasFullPct > .5 & DenhatBiasFullPct < 1.4))+
+ggplot(data=filter(compiled, sizeRep == "Full", whichSource == 'SimData', OGmodel %in% c("g0 tilde bk", "g0 tilde 1")), 
+       aes(x=trial, y=Denhat, fill=subtype))+
+  scale_fill_grey(name="Subsampling\nType") +
+  geom_violin(scale = 'width') +
+  stat_summary(fun.y = mean, fun.ymin = mean, fun.ymax = mean,
+               geom = "point",
+               size = .75,
+               shape = 23,
+               stroke = 1.5,
+               color = 'white',
+               position = position_dodge(.9))+
+  ylab("Denhat") +
+  xlab("Scenario") +
+  ggtitle("Denhat vs \nSubsampling Type (Simulated, Full)") +
+  scale_fill_manual(values= c( 'gray', 'dodgerblue1', 'dodgerblue4')) +
+  theme_grey(14) +
+  facet_wrap(~model) +
+  geom_hline(aes(yintercept=trueDensity), linetype='dashed')+
+  theme(legend.position="bottom", legend.title=element_blank()) + ggsave("Figures/Dsub_onlyFull_insanityCheck_simmed.png", height=5, width = 7.5)
+
+filter(compiled, sizeRep == "Full", whichSource == 'SimData') %>% group_by(trial) %>% sumarise(n())
+
+
+
+# d1 = filter(discrep, whichSource == "EmpData")
+# d2 = filter(discrep, whichSource == "SimData")
+# d1$trial = "Empirical"
+# discrep = rbind(d1,d2)
+
+ggplot(data=filter(discrepSlim, whichSource=="SimData", size=="250", model == "g0 ~ 1" | model == "g0 ~ bk", SubsamplingType!="Full", DenhatBiasFullPct > .5 & DenhatBiasFullPct < 1.4))+
   scale_fill_grey(name="Subsampling\nType") +
   geom_boxplot(aes(x=trial, y=DenhatBiasFullPct, fill=SubsamplingType)) +
   ylab(TeX('$\\hat{D}_{Sub}$ / $\\hat{D}_{Full}$')) +
@@ -278,11 +374,12 @@ ggplot(data=filter(discrep, whichSource=="SimData", size=="250", model == "g0 ~ 
   geom_hline(aes(yintercept=1), linetype='dashed')+
   facet_wrap(~model, ncol=4) + ggsave("Figures/Dsub_Dfull_simmed.png", height=5, width = 7.5)
 
-meanTrials <- discrep %>% group_by(trial, SubsamplingType, model) %>%
+meanTrials <- discrepSlim %>% group_by(trial, SubsamplingType, model) %>%
   summarise(meanT = mean(DenhatBiasFullPct)) %>%
   filter(model == "g0 tilde 1" | model == "g0 tilde bk")
 
-ggplot(data=filter(discrep, size=="250", model == "g0 ~ 1" | model == "g0 ~ bk", SubsamplingType!="Full", DenhatBiasFullPct > .5 & DenhatBiasFullPct < 1.4),
+#Figure 4
+ggplot(data=filter(discrepSlim, size=="250", model == "g0 ~ 1" | model == "g0 ~ bk", SubsamplingType!="Full", DenhatBiasFullPct > .5 & DenhatBiasFullPct < 1.4),
        aes(x=trial, y=DenhatBiasFullPct, fill=SubsamplingType))+
   scale_fill_grey(name="Subsampling\nType") +
   geom_violin() +
@@ -300,7 +397,7 @@ ggplot(data=filter(discrep, size=="250", model == "g0 ~ 1" | model == "g0 ~ bk",
   xlab("Trial") +
   geom_hline(aes(yintercept=1), linetype='dashed')+
   theme(legend.position="bottom", legend.title=element_blank()) +
-  facet_wrap(~str_replace(string = model, "tilde", "\\~"), ncol=4) + ggsave("Figures/Violin_Dsub_Dfull_all.png", height=5, width = 7.5)
+  facet_wrap(~model, ncol=4) + ggsave("Figures/Violin_Dsub_Dfull_all.png", height=5, width = 7.5)
 # 
 # ggplot(data=filter(discrep, size=="250", model == "g0 tilde 1" | model == "g0 tilde bk", SubsamplingType!="Full", DenhatBiasFullPct > .5 & DenhatBiasFullPct < 1.4))+
 #   scale_fill_grey(name="Subsampling\nType") +
@@ -368,7 +465,7 @@ ggplot(data=filter(discrep, whichSource=="EmpData",
   facet_wrap(~model,ncol=4) +
   xlab("Size of Subsample") + ggsave("Figures/Color_Dsub_Dfull_emp.png", height=5, width = 7.5)
 
-ggplot(data=filter(discrep, whichSource=="EmpData", 
+ggplot(data=filter(discrepSlim, whichSource=="EmpData", 
                    SubsamplingType!="Full"), aes(x = as.character(size), y=DenhatBiasFullPct, fill=SubsamplingType))+
   scale_fill_grey(name="Subsampling\nType") +
   geom_violin()+
@@ -435,38 +532,39 @@ ggplot(data=filter(discrep, whichSource=="SimData", model == "g0 ~ 1" | model ==
 
 #from john - Modify Fig 5 so that it displays the mean (D^/D true) + a confidence interval for D^/Dtrue - rather than all of the individual results.  This will allow us to tell where there is strong evidence for bias; by contrast, if CIs overlap 1, then differences might just be explained by sampling error/small numbers of sims.  To get the CI, use  mean (D^/Dtrue)  +/- 1.96*sd(D^/Dtrue)/sqrt(nsims).  
 # Except the below is wrong because it is comparing to full D hat rather than d true
-discrep2 <- discrep %>% 
+discrepSlim2 <- discrepSlim %>% 
   filter(whichSource!='EmpData', !is.na(DenhatBiasTruePct))%>%
   group_by(SubsamplingType, trial, model, sizeRep) %>%
   summarise(meanDenhatFullPct = mean(DenhatBiasFullPct), CI_denhatBias = 1.96*sd(DenhatBiasFullPct)/sqrt(n()),
-            meanDenhatTruePct = mean(DenhatBiasTruePct), CI_denhatTrueBias = 1.96*sd(DenhatBiasTruePct)/sqrt(n()), N = n())
+            meanDenhatTruePct = mean(DenhatBiasTruePct), CI_denhatTrueBias = 1.96*sd(DenhatBiasTruePct)/sqrt(n()),
+            meanDenhat = mean(Denhat), CI_denhat = 1.96*sd(Denhat)/sqrt(n()), N = n())
 
-ggplot(data=filter(discrep2, SubsamplingType!='Full', trial!="Empirical", size==250, model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
-  geom_point(aes(y=meanDenhatFullPct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
-  geom_errorbar(aes(ymin=meanDenhatFullPct - CI_denhatBias, ymax=meanDenhatFullPct + CI_denhatBias), position=position_dodge(.4), colour="black", width = .4) +
-  ggtitle(TeX('$\\hat{D}_{Sub}$ / $\\hat{D}_{Full}$ (Simulated, n=250)')) +
-  ylab("Derived density of subsample / \nDerived density of full sample (95% CI)") +
-  xlab("Scenario") +
-  theme_grey(14) +
-  scale_color_manual(values= c('dodgerblue1', 'dodgerblue4')) +
-  facet_wrap(~model, ncol=2)+
-  theme(legend.position="bottom", legend.title=element_blank()) +
-  geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_Dsub_Dfull_simmed.png", height=5, width = 7.5)
-
-ggplot(data=filter(discrep2, SubsamplingType!='Full',trial!="Empirical", model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
-  geom_point(aes(y=meanDenhatFullPct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
-  geom_errorbar(aes(ymin=meanDenhatFullPct - CI_denhatBias, ymax=meanDenhatFullPct + CI_denhatBias), position=position_dodge(.4), colour="black", width = .4) +
-  ggtitle(TeX('$\\hat{D}_{Sub}$ / $\\hat{D}_{Full}$ (Simulated, n=250)')) +
-  ylab("Derived density of subsample / \nDerived density of full sample (95% CI)") +
-  xlab("Scenario") +
-  theme_grey(14) +
-  scale_color_manual(values= c('dodgerblue1', 'dodgerblue4')) +
-  facet_grid(size~model)+
-  theme(legend.position="bottom", legend.title=element_blank()) +
-  geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_ALL_Dsub_DFull_simmed.png", height=5, width = 7.5)
+# ggplot(data=filter(discrep2, SubsamplingType!='Full', trial!="Empirical", size==250, model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
+#   geom_point(aes(y=meanDenhatFullPct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
+#   geom_errorbar(aes(ymin=meanDenhatFullPct - CI_denhatBias, ymax=meanDenhatFullPct + CI_denhatBias), position=position_dodge(.4), colour="black", width = .4) +
+#   ggtitle(TeX('$\\hat{D}_{Sub}$ / $\\hat{D}_{Full}$ (Simulated, n=250)')) +
+#   ylab("Derived density of subsample / \nDerived density of full sample (95% CI)") +
+#   xlab("Scenario") +
+#   theme_grey(14) +
+#   scale_color_manual(values= c('dodgerblue1', 'dodgerblue4')) +
+#   facet_wrap(~model, ncol=2)+
+#   theme(legend.position="bottom", legend.title=element_blank()) +
+#   geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_Dsub_Dfull_simmed.png", height=5, width = 7.5)
+# 
+# ggplot(data=filter(discrep2, SubsamplingType!='Full',trial!="Empirical", model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
+#   geom_point(aes(y=meanDenhatFullPct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
+#   geom_errorbar(aes(ymin=meanDenhatFullPct - CI_denhatBias, ymax=meanDenhatFullPct + CI_denhatBias), position=position_dodge(.4), colour="black", width = .4) +
+#   ggtitle(TeX('$\\hat{D}_{Sub}$ / $\\hat{D}_{Full}$ (Simulated, n=250)')) +
+#   ylab("Derived density of subsample / \nDerived density of full sample (95% CI)") +
+#   xlab("Scenario") +
+#   theme_grey(14) +
+#   scale_color_manual(values= c('dodgerblue1', 'dodgerblue4')) +
+#   facet_grid(size~model)+
+#   theme(legend.position="bottom", legend.title=element_blank()) +
+#   geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_ALL_Dsub_DFull_simmed.png", height=5, width = 7.5)
 
 # now for what he ACTUALLY wanted.... dsub over true D rather than full Dhat estimate
-ggplot(data=filter(discrep2, trial!="Empirical", sizeRep %in% c("250", "Full"), model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
+ggplot(data=filter(discrepSlim2, trial!="Empirical", sizeRep %in% c("250", "Full"), model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
   geom_point(aes(y=meanDenhatTruePct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
   geom_errorbar(aes(ymin=meanDenhatTruePct - CI_denhatTrueBias, ymax=meanDenhatTruePct + CI_denhatTrueBias), position=position_dodge(.4), colour="black", width = .4) +
   ggtitle(TeX('$\\hat{D}_{Sub}$ / $D$ (Simulated, n=250)')) +
@@ -478,8 +576,35 @@ ggplot(data=filter(discrep2, trial!="Empirical", sizeRep %in% c("250", "Full"), 
   theme(legend.position="bottom", legend.title=element_blank()) +
   geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_Dsub_D_simmed.png", height=5, width = 7.5)
 
+#Using just denhat with horizontal line for true density
+ggplot(data=filter(discrepSlim2, trial!="Empirical", sizeRep %in% c("250", "Full"), model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
+  geom_point(aes(y=meanDenhat, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
+  geom_errorbar(aes(ymin=meanDenhat - CI_denhat, ymax=meanDenhat + CI_denhat), position=position_dodge(.4), colour="black", width = .4) +
+  ggtitle(TeX('$\\hat{D}_{Sub}$ (Simulated, n=250)')) +
+  ylab("Derived density (95% CI)") +
+  xlab("Scenario") +
+  theme_grey(14) +
+  scale_color_manual(values= c('seagreen','dodgerblue1', 'dodgerblue4')) +
+  facet_wrap(~model, ncol=2)+
+  theme(legend.position="bottom", legend.title=element_blank()) +
+  geom_hline(yintercept=trueDensity, linetype =2)  + 
+  ggsave("Figures\\pointsCI_Dsub_simmed.png", height=5, width = 7.5)
+
+ggplot(data=filter(discrepSlim2, trial!="Empirical", model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
+  geom_point(aes(y=meanDenhat, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
+  geom_errorbar(aes(ymin=meanDenhat - CI_denhat, ymax=meanDenhat + CI_denhat), position=position_dodge(.4), colour="black", width = .4) +
+  ggtitle(TeX('$\\hat{D}_{Sub}$ (Simulated)')) +
+  ylab("Derived density (95% CI)") +
+  xlab("Scenario") +
+  theme_grey(14) +
+  scale_color_manual(values= c('seagreen','dodgerblue1', 'dodgerblue4')) +
+  facet_wrap(sizeRep~model, ncol=2)+
+  theme(legend.position="bottom", legend.title=element_blank()) +
+  geom_hline(yintercept=trueDensity, linetype =2)  + 
+  ggsave("Figures\\pointsCI_ALL_Dsub_simmed.png", height=5, width = 7.5)
+
 # 
-ggplot(data=filter(discrep2, trial!="Empirical", model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
+ggplot(data=filter(discrepSlim2, trial!="Empirical", model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
   geom_point(aes(y=meanDenhatTruePct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
   geom_errorbar(aes(ymin=meanDenhatTruePct - CI_denhatTrueBias, ymax=meanDenhatTruePct + CI_denhatTrueBias), position=position_dodge(.4), colour="black", width = .4) +
   ggtitle(TeX('$\\hat{D}_{Sub}$ / $D$ (Simulated, n=250)')) +
@@ -489,7 +614,11 @@ ggplot(data=filter(discrep2, trial!="Empirical", model %in% c("g0 ~ 1", "g0 ~ bk
   scale_color_manual(values= c('seagreen','dodgerblue1', 'dodgerblue4')) +
   facet_wrap(sizeRep~model, ncol=2)+
   theme(legend.position="bottom", legend.title=element_blank()) +
-  geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_ALL_Dsub_D_simmed.png", height=5, width = 7.5)
+  geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_ALL_Dsub_D_simmed.png", height=10, width = 7.5)
+
+
+
+
 
 ggplot(data=filter(discrep2, trial!="Empirical", SubsamplingType!='Full', size==250, model %in% c("g0 ~ 1", "g0 ~ bk")), aes(color = SubsamplingType,x=trial, group = SubsamplingType))+
   geom_point(aes(y=meanDenhatTruePct, shape=SubsamplingType), position=position_dodge(.4), size=3, fill="white", stat = 'identity') +
@@ -502,101 +631,6 @@ ggplot(data=filter(discrep2, trial!="Empirical", SubsamplingType!='Full', size==
   facet_wrap(~model, ncol=2)+
   theme(legend.position="bottom", legend.title=element_blank()) +
   geom_hline(yintercept=1, linetype =2)  + ggsave("Figures\\pointsCI_Dsub_D_noFull_simmed.png", height=5, width = 7.5)
-
-
-#Stale money plots
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial==c("t4","t5","t6","t7")))+
-  scale_fill_grey() +
-  geom_boxplot(aes(x=trial, y=SubProp.notRedun, fill=subtype)) +
-  ylab("Proportion of \nnon-redundant Samples") +
-  xlab("Trial") +
-  ggtitle("Sample Redundancy \nvs Subsampling Type (Simulated)") +
-  theme_light() +
-  facet_wrap(~size)
-
-ggplot(data=filter(compiled, whichSource=="EmpData", size!="999"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Emulated)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t1"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t1)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t2"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t2)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t3"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t3)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t4"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t4)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t5"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t5)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t6"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t6)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t7"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t7)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
-ggplot(data=filter(compiled, whichSource=="SimData", trial=="t8"))+
-  scale_fill_hue() +
-  geom_boxplot(aes(x=trial, y=Denhat, fill=subtype)) +
-  ylab("Derived density") +
-  xlab("Trial") +
-  ggtitle("d-hat \nvs Subsampling Type (Simulated, t8)") +
-  theme_light() +
-  facet_wrap(model~size,ncol=3)
-
 
 ggplot(data=filter(discrep, whichSource=="SimData"))+
   scale_fill_grey() +

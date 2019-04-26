@@ -1,0 +1,165 @@
+%%% ========================================================= %%%
+%%% Package ecography.sty                                     %%%
+%%% Bonenfant Christophe bonenfan@biomserv.univ-lyon1.fr      %%%
+%%% Mathieu Basille basille@biomserv.univ-lyon1.fr            %%%
+%%% 15.05.2010                                                %%%
+%%% ========================================================= %%%
+
+
+%%% Encodage et police
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+%%% Package divers et langue
+\usepackage{graphicx,url,color}
+\usepackage[english]{babel}
+%%% Mise en page : A4 large, numérotation de toutes les lignes, interligne double, aligné
+%%% à gauche sans justification, paragraphes indentés
+\usepackage{a4wide}
+\usepackage{lineno}
+  \pagewiselinenumbers
+  \modulolinenumbers[2]
+\usepackage{setspace}
+%%%  \doublespacing
+\usepackage[document]{ragged2e}
+  \setlength\RaggedRightParindent{\parindent}
+  \setlength\RaggedRightRightskip{0pt plus 1fil}
+%%% Style de bibliographie adapté à Journal of Wildlife Management, gestion des \cite dans le texte
+\usepackage{natbib}
+  \bibliographystyle{jwm}
+  \bibpunct{(}{)}{,}{a}{}{,}
+%%% Change the format of a figure caption
+%%% For more options see the package documentation
+\usepackage{ccaption}
+  \captionnamefont{\small\bfseries}
+  \captiontitlefont{\small}
+  \captiondelim{.~}
+  \hangcaption
+  \renewcommand{\figurename}{Figure}
+%%% Trois nouvelles commandes pour le '\maketitle' : 
+%%% '\running' : Running head
+%%% '\articletype' : type d'article en première page
+%%% '\keywordsname' : le nom de l'environnement keywords
+\newcommand{\@articletype}{}
+\newcommand{\articletype}[1]{\renewcommand{\@articletype}{#1}}
+\newcommand{\keywordsname}{KEY WORDS}
+\newcommand{\@running}{}
+\newcommand{\running}[1]{\renewcommand{\@running}{#1}}
+\newcommand{\@shortauthors}{}
+\newcommand{\shortauthors}[1]{\renewcommand{\@shortauthors}{#1}}
+%%% Pour les pieds de page
+\usepackage{fancyhdr}
+  \pagestyle{fancy}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0.5pt}
+  \fancyhf{}
+  \fancyfoot[LE,RO]{\thepage} 
+  \fancyfoot[LO]{\rightmark}
+  \fancyfoot[RE]{\leftmark}
+  \lfoot[\thepage]{\@shortauthors~$\bullet$~\@running}
+  \rfoot[The Journal of Widlife Management~$\bullet$~00(0)]{\thepage}
+%%% Style des notes de bas de page en italique
+\renewcommand{\@makefntext}[1]%
+  {\noindent\itshape\makebox[1.8em][r]{\@makefnmark}#1}
+%%% Supprime le trait des notes de bas de page
+\renewcommand{\footnoterule}{}
+
+%%% Commande '\maketitle' modifiée
+\if@compatibility
+\renewenvironment{titlepage}
+    {%
+      \if@twocolumn
+        \@restonecoltrue\onecolumn
+      \else
+        \@restonecolfalse\newpage
+      \fi
+      \thispagestyle{empty}%
+      \setcounter{page}\z@
+    }%
+    {\if@restonecol\twocolumn \else \fi
+    }
+\else
+\renewenvironment{titlepage}
+    {%
+      \if@twocolumn
+        \@restonecoltrue\onecolumn
+      \else
+        \@restonecolfalse\newpage
+      \fi
+      \thispagestyle{empty}%
+      \setcounter{page}\@ne
+    }%
+    {\if@restonecol\twocolumn \else \fi
+     \if@twoside\else
+        \setcounter{page}\@ne
+     \fi
+    }
+\fi
+
+\renewcommand\maketitle{\begin{titlepage}%
+\let\footnotesize\small
+\let\footnoterule\relax
+\let \footnote \thanks
+\large\itshape\noindent\@articletype \par%
+\vskip 5pt%
+\normalfont\normalsize
+\begin{flushleft}%
+  {\bfseries\LARGE \@title \par}%
+\end{flushleft}\par
+  \vskip 5pt%
+  {\normalsize\parbox{\linewidth}{
+    \begin{tabular}[t]{c}%
+      \@author
+    \end{tabular}}\par}%
+\@thanks
+%\vfil\null
+\vskip 5pt
+\end{titlepage}%
+\setcounter{footnote}{0}%
+\global\let\thanks\relax
+\global\let\maketitle\relax
+\global\let\@thanks\@empty
+\global\let\@author\@empty
+\global\let\@date\@empty
+\global\let\@title\@empty
+\global\let\title\relax
+\global\let\author\relax
+\global\let\date\relax
+\global\let\and\relax
+}
+
+%%% Pour la gestion des auteurs/affiliations (bricolage, je n'arrive pas à intégrer
+%%% correctement les commandes du paquets pour faire le même travail.
+\usepackage[blocks]{authblk2}
+\renewcommand\Authfont{\bfseries}
+\renewcommand\Affilfont{\itshape}
+
+%%% Environnement 'abstract' dans le style du journal
+\renewenvironment{abstract}{%
+  \quotation\small
+  {\noindent\bfseries\MakeUppercase\abstractname\hspace{1ex}}%
+  \normalsize}
+{\endquotation}
+
+%%% Environnement 'keywords' dans le style du journal
+\newenvironment{keywords}{%
+  \quotation\small
+  {\noindent\bfseries\keywordsname\hspace{1ex}}%
+  \normalsize}
+{\endquotation}
+
+%%% Style des titres (pas de numérotation, utiliser \section*
+\renewcommand\section{\@startsection{section}{1}{\z@}%
+  {-3.5ex \@plus -1ex \@minus -.2ex}%
+  {2.3ex \@plus.2ex}%
+  {\large\bfseries\MakeUppercase}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}%
+  {-3.25ex\@plus -1ex \@minus -.2ex}%
+  {1.5ex \@plus .2ex}%
+  {\bfseries}}
+\renewcommand\subsubsection{\@startsection{subsubsection}{3}{\z@}%
+  {-3.25ex\@plus -1ex \@minus -.2ex}%
+  {1.5ex \@plus .2ex}%
+  {\normalfont\normalsize\bfseries}}
+
+
